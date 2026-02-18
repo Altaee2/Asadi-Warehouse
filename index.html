@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام الأسدي للبورسلين </title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+    <style>
+        body { font-family: 'Cairo', sans-serif; background-color: #0b0f1a; color: #f8fafc; overflow-x: hidden; }
+        .glass-card { background: rgba(30, 41, 59, 0.6); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.08); }
+        .input-style { background: #1e293b; border: 1px solid #334155; padding: 12px; border-radius: 10px; width: 100%; color: white; outline: none; transition: all 0.3s; }
+        .input-style:focus { border-color: #38bdf8; box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2); }
+        .loading-overlay { position: fixed; inset: 0; background: #0b1120; display: flex; justify-content: center; align-items: center; z-index: 9999; }
+        .low-stock-pulse { border: 2px solid #ef4444 !important; animation: border-pulse 2s infinite; }
+        @keyframes border-pulse { 0% { border-color: #ef4444; } 50% { border-color: transparent; } 100% { border-color: #ef4444; } }
+        .modal { display: none; position: fixed; inset: 0; z-index: 100; background: rgba(0,0,0,0.8); backdrop-filter: blur(5px); justify-content: center; align-items: center; padding: 20px; }
+        .modal.active { display: flex; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #38bdf8; border-radius: 10px; }
+    </style>
+</head>
+<body>
+
+    <!-- Loading Screen -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="text-center">
+            <div class="inline-block w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+            <p class="text-blue-400 font-bold tracking-widest">مستودعات الأسدي</p>
+        </div>
+    </div>
+
+    <!-- Login Page -->
+    <div id="loginPage" class="hidden min-h-screen flex items-center justify-center p-4 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-blue-900/20 via-slate-900 to-slate-950">
+        <div class="glass-card p-8 rounded-3xl w-full max-w-md shadow-2xl border-t border-white/20">
+            <div class="text-center mb-8">
+                <div class="w-20 h-20 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg rotate-3">
+                    <i class="fas fa-shield-halved text-4xl text-white"></i>
+                </div>
+                <h1 class="text-3xl font-bold">بوابة الإدارة</h1>
+                <p class="text-slate-400 mt-2">نظام إدارة البورسلين الذكي</p>
+            </div>
+            <div class="space-y-5">
+                <input type="email" id="loginEmail" class="input-style" placeholder="البريد الإلكتروني">
+                <input type="password" id="loginPass" class="input-style" placeholder="كلمة المرور">
+                <button id="btnLogin" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl transition-all active:scale-95 shadow-lg shadow-blue-500/20">
+                    تسجيل الدخول
+                </button>
+                <p id="loginError" class="text-red-400 text-sm text-center hidden"></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main App Content -->
+    <div id="appContent" class="hidden min-h-screen">
+        <nav class="glass-card sticky top-0 z-40 p-4 border-b border-white/10">
+            <div class="container mx-auto flex justify-between items-center">
+                <div class="flex items-center gap-4">
+                    <i class="fas fa-cubes text-3xl text-blue-500"></i>
+                    <div>
+                        <h2 class="font-bold text-xl tracking-tight"> ادارة مخزن بورسلين الاسدي</h2>
+                        <div class="flex items-center gap-2">
+                            <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+                            <span class="text-[10px] text-emerald-400 uppercase font-bold tracking-wider">متصل بالنظام السحابي</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    
+                    <button id="btnLogout" class="bg-red-500/10 hover:bg-red-500/20 text-red-500 px-4 py-2 rounded-xl transition text-sm font-bold border border-red-500/20">
+                        <i class="fas fa-power-off ml-2"></i> خروج
+                    </button>
+                </div>
+            </div>
+        </nav>
+
+        <main class="container mx-auto p-4 lg:p-8">
+            <!-- Stats Dashboard -->
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                <div class="glass-card p-5 rounded-2xl">
+                    <p class="text-slate-400 text-xs mb-1">إجمالي الأصناف</p>
+                    <h3 id="statTotalItems" class="text-3xl font-black text-blue-500">0</h3>
+                </div>
+                <div class="glass-card p-5 rounded-2xl">
+                    <p class="text-slate-400 text-xs mb-1">الكمية الكلية</p>
+                    <h3 id="statTotalQty" class="text-3xl font-black text-emerald-500">0</h3>
+                </div>
+                <div class="glass-card p-5 rounded-2xl border-r-4 border-amber-500">
+                    <p class="text-slate-400 text-xs mb-1">هندي / إيراني</p>
+                    <div class="flex gap-2 items-baseline">
+                        <span id="statOrigin" class="text-xl font-bold">0 / 0</span>
+                    </div>
+                </div>
+                <div class="glass-card p-5 rounded-2xl border-r-4 border-red-500">
+                    <p class="text-slate-400 text-xs mb-1">تنبيه النفاذ (≤50)</p>
+                    <h3 id="statLowStock" class="text-3xl font-black text-red-500">0</h3>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                <!-- Side Form -->
+                <div class="lg:col-span-4">
+                    <div class="glass-card p-6 rounded-3xl sticky top-28 shadow-xl">
+                        <h3 class="text-xl font-bold mb-6 flex items-center gap-3 text-blue-400">
+                            <i class="fas fa-plus-circle"></i> توريد بضاعة جديدة
+                        </h3>
+                        <form id="productForm" class="space-y-4">
+                            <div class="grid grid-cols-2 gap-3">
+                                <input type="text" id="pCode" class="input-style" placeholder="كود الصنف" required>
+                                <select id="pOrigin" class="input-style">
+                                    <option value="هندي">منشأ هندي</option>
+                                    <option value="إيراني">منشأ إيراني</option>
+                                    <option value="إماراتي">منشأ إماراتي</option>
+                                    <option value="صيني">منشأ صيني</option>
+                                </select>
+                            </div>
+                            <input type="text" id="pName" class="input-style" placeholder="اسم المنتج (مثلاً: بورسلين ليزر 60*120)" required>
+                            
+                            <div class="grid grid-cols-2 gap-3">
+                                <input type="number" id="pQty" step="any" class="input-style" placeholder="الكمية" required>
+                                <select id="pCategory" class="input-style">
+                                    <option value="أرضيات">أرضيات</option>
+                                    <option value="جدران">جدران</option>
+                                    <option value="ديكور">ديكورات</option>
+                                    <option value="خارجي">خارجي</option>
+                                </select>
+                            </div>
+                         
+
+                              <div class="relative h-24 border-2 border-dashed border-slate-700 rounded-xl flex items-center justify-center bg-slate-800/20 cursor-pointer overflow-hidden">
+                                <input type="file" id="pImage" accept="image/*" class="absolute inset-0 opacity-0 cursor-pointer">
+                                <div id="imagePreviewContainer" class="text-center">
+                                    <i class="fas fa-camera text-2xl text-slate-500"></i>
+                                    <p id="imageStatus" class="text-[10px] text-slate-400 mt-1">اضغط لاختيار صورة</p>
+                                </div>
+                                <img id="previewImg" class="hidden absolute inset-0 w-full h-full object-cover">
+                                </div>
+                            <button type="submit" id="btnSave" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-2xl transition-all shadow-lg">
+                                <i class="fas fa-save ml-2"></i> إضافة للمخزن
+                            </button>
+                            
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Product Grid -->
+                <div class="lg:col-span-8">
+                    <div class="flex flex-col md:flex-row gap-4 mb-6">
+                        <div class="relative flex-1">
+                            <i class="fas fa-search absolute right-4 top-1/2 -translate-y-1/2 text-slate-500"></i>
+                            <input type="text" id="searchInput" class="input-style pr-12" placeholder="ابحث بالكود، الاسم، أو المنشأ...">
+                        <div class="relative flex-1">
+</div>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="filterItems('الكل')" class="px-4 py-2 bg-slate-800 rounded-xl text-sm border border-white/5 active:bg-blue-600 transition">الكل</button>
+                            <button onclick="filterItems('low')" class="px-4 py-2 bg-red-500/20 text-red-400 rounded-xl text-sm border border-red-500/20 active:bg-red-600 transition">النواقص</button>
+                            <button onclick="exportToExcel()" class="px-4 py-2 bg-emerald-600/20 text-emerald-400 rounded-xl text-sm border border-emerald-500/20 active:bg-emerald-600 transition">
+    <i class="fas fa-file-excel ml-1"></i> تصدير Excel
+</button>
+                        </div>
+                    </div>
+
+                    <div id="productsGrid" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- Dynamic Cards -->
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <div id="qtyModal" class="modal">
+        <div class="glass-card p-8 rounded-3xl w-full max-w-sm border-t border-white/20">
+            <h3 id="modalTitle" class="text-xl font-bold mb-4 text-center">تعديل الكمية</h3>
+            <p id="modalItemName" class="text-slate-400 text-center text-sm mb-6"></p>
+            <input type="number" id="modalInput" step="any" class="input-style mb-6 text-center text-2xl font-bold" placeholder="أدخل الرقم هنا">
+            <div class="grid grid-cols-2 gap-4">
+                <button onclick="closeModal()" class="bg-slate-700 p-3 rounded-xl">إلغاء</button>
+                <button id="btnConfirmQty" class="bg-blue-600 p-3 rounded-xl font-bold">تأكيد</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="settingsModal" class="modal">
+        <div class="glass-card p-8 rounded-3xl w-full max-w-md border-t border-white/20">
+            <h3 class="text-xl font-bold mb-6 flex items-center gap-2">
+                <i class="fas fa-bell text-yellow-500"></i> إعدادات التنبيهات
+            </h3>
+            <div class="space-y-4">
+                <div>
+                    <label class="text-xs text-slate-400 block mb-1">Telegram Bot Token</label>
+                    <input type="text" id="tgToken" class="input-style text-xs" placeholder="ادخل توكن البوت">
+                </div>
+                <div>
+                    <label class="text-xs text-slate-400 block mb-1">Telegram Chat ID</label>
+                    <input type="text" id="tgChatId" class="input-style text-xs" placeholder="ادخل معرف الشات">
+                </div>
+                <div class="p-4 bg-blue-500/10 rounded-xl border border-blue-500/20">
+                    <p class="text-[10px] text-blue-400 leading-relaxed">
+                        * سيقوم النظام تلقائياً بإرسال رسالة لتلجرام عندما تصل أي مادة إلى كمية 50 أو أقل. تأكد من أن البوت نشط.
+                    </p>
+                </div>
+                
+                <button onclick="saveSettings()" class="w-full bg-emerald-600 p-3 rounded-xl font-bold mt-4">حفظ الإعدادات</button>
+                <button onclick="closeModal()" class="w-full text-slate-500 text-sm">إغلاق</button>
+            </div>
+        </div>
+    </div>
+    
+<script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc, onSnapshot, query, orderBy, increment, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Firebase Config
+        const firebaseConfig = {
+            apiKey: "AIzaSyAgGWk60BulYAgAAmM7xCxVc5zxURT-g5o",
+            authDomain: "manage-asady.firebaseapp.com",
+            projectId: "manage-asady",
+            storageBucket: "manage-asady.firebasestorage.app",
+            messagingSenderId: "80487794672",
+            appId: "1:80487794672:web:cfdae9dfb6293e26de7f35"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const appId = "asady-porcelain-v2"; // نفس المعرف القديم لبياناتك
+
+        let currentModalTarget = null;
+        let currentModalAction = null;
+        let settings = { tgToken: '', tgChatId: '' };
+        let base64Image = ""; // المتغير السحري لحل مشكلة التعليق
+
+        // --- Authentication ---
+        onAuthStateChanged(auth, async (user) => {
+            document.getElementById('loadingOverlay').classList.add('hidden');
+            if (user) {
+                document.getElementById('loginPage').classList.add('hidden');
+                document.getElementById('appContent').classList.remove('hidden');
+                await loadSettings();
+                initInventoryListener();
+            } else {
+                document.getElementById('appContent').classList.add('hidden');
+                document.getElementById('loginPage').classList.remove('hidden');
+            }
+        });
+
+        // --- تصحيح اختيار الصورة (تحويلها لنص Base64 فوراً) ---
+        document.getElementById('pImage').onchange = (e) => {
+            const file = e.target.files[0];
+            const statusText = document.getElementById('imageStatus');
+            const previewImg = document.getElementById('previewImg');
+            
+            if (file) {
+                statusText.innerText = "تم اختيار: " + file.name;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    base64Image = event.target.result; // حفظ الصورة هنا
+                    previewImg.src = base64Image;
+                    previewImg.classList.remove('hidden');
+                };
+                reader.readAsDataURL(file);
+            } else {
+                statusText.innerText = "اضغط لاختيار صورة";
+                previewImg.classList.add('hidden');
+                base64Image = "";
+            }
+        };
+
+        document.getElementById('btnLogin').onclick = async () => {
+            const email = document.getElementById('loginEmail').value;
+            const pass = document.getElementById('loginPass').value;
+            try {
+                await signInWithEmailAndPassword(auth, email, pass);
+            } catch (err) {
+                alert("خطأ في الدخول: تأكد من البيانات");
+            }
+        };
+
+        document.getElementById('btnLogout').onclick = () => signOut(auth);
+
+        // --- Settings & Telegram ---
+        async function loadSettings() {
+            try {
+                const sDoc = await getDoc(doc(db, 'artifacts', appId, 'public', 'config', 'settings'));
+                if (sDoc.exists()) {
+                    settings = sDoc.data();
+                    document.getElementById('tgToken').value = settings.tgToken || '';
+                    document.getElementById('tgChatId').value = settings.tgChatId || '';
+                }
+            } catch (e) { console.error("Settings load fail", e); }
+        }
+
+        window.saveSettings = async () => {
+            const tgToken = document.getElementById('tgToken').value;
+            const tgChatId = document.getElementById('tgChatId').value;
+            await setDoc(doc(db, 'artifacts', appId, 'public', 'config', 'settings'), { tgToken, tgChatId });
+            settings = { tgToken, tgChatId };
+            alert("✅ تم حفظ إعدادات التليجرام");
+            closeModal();
+        };
+
+        async function sendTelegramAlert(itemName, qty, code) {
+            if (!settings.tgToken || !settings.tgChatId) return;
+            const message = `🚨 *تنبيه مخزن الأسدي*\n\nالمادة: ${itemName}\nالكود: ${code}\nالكمية: ${qty}\n⚠️ *الكمية شارفت على النفاذ!*`;
+            const url = `https://api.telegram.org/bot${settings.tgToken}/sendMessage?chat_id=${settings.tgChatId}&text=${encodeURIComponent(message)}&parse_mode=Markdown`;
+            try { fetch(url); } catch (e) { console.error("Telegram fail", e); }
+        }
+
+        // --- إضافة المنتج (تم إلغاء الرفع المعلق واستبداله بالحفظ المباشر) ---
+        document.getElementById('productForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('btnSave');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الحفظ...';
+
+            // ابحث عن document.getElementById('productForm').onsubmit وحدث الـ data
+const data = {
+    code: document.getElementById('pCode').value,
+    name: document.getElementById('pName').value,
+    qty: parseFloat(document.getElementById('pQty').value),
+    origin: document.getElementById('pOrigin').value,
+    category: document.getElementById('pCategory').value,
+    image: base64Image || "https://via.placeholder.com/400x300",
+    updatedAt: new Date().toISOString()
+};
+
+            try {
+                // الحفظ مباشرة في الداتابيس (Firestore)
+                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'inventory'), data);
+                
+                // تصفير الواجهة بعد النجاح
+                e.target.reset();
+                base64Image = "";
+                document.getElementById('previewImg').classList.add('hidden');
+                document.getElementById('imageStatus').innerText = "اضغط لاختيار صورة";
+                alert("✅ تم إضافة المنتج للمخزن بنجاح");
+            } catch (err) {
+                console.error(err);
+                alert("❌ حدث خطأ، تأكد من اتصال الانترنت");
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-save ml-2"></i> إضافة للمخزن';
+            }
+        };
+
+        function initInventoryListener() {
+            const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'inventory'), orderBy('updatedAt', 'desc'));
+            onSnapshot(q, (snap) => {
+                const grid = document.getElementById('productsGrid');
+                grid.innerHTML = '';
+                let tItems = 0, tQty = 0, lowStock = 0, hindi = 0, irani = 0;
+
+                snap.forEach(docSnap => {
+                    const item = docSnap.data();
+                    const id = docSnap.id;
+                    tItems++; tQty += item.qty;
+                    if (item.qty <= 50) lowStock++;
+                    if (item.origin === 'هندي') hindi++;
+                    if (item.origin === 'إيراني') irani++;
+
+                    const isLow = item.qty <= 50;
+                    const card = document.createElement('div');
+                    card.className = `glass-card rounded-3xl overflow-hidden group border-2 ${isLow ? 'low-stock-pulse border-red-500/50 bg-red-500/5' : 'border-white/5'} transition-all duration-500`;
+                    card.innerHTML = `
+                        <div class="relative h-56 overflow-hidden">
+                            <img src="${item.image}" class="w-full h-full object-cover group-hover:scale-110 transition duration-700">
+                            <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
+                            <div class="absolute bottom-4 right-4 left-4 flex justify-between items-end">
+                                <div>
+                                    <span class="bg-blue-600 text-[15px] font-bold px-2 py-1 rounded-lg mb-1 inline-block uppercase tracking-wider">${item.origin}</span>
+                                    <h4 class="font-bold text-white text-lg leading-tight truncate w-40">${item.name}</h4>
+                                </div>
+                                <div class="text-left">
+                                    <span class="block text-[25px] text-slate-300">كود: ${item.code}</span>
+                                    <span class="block text-xs font-bold text-blue-400">${item.category}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="p-5">
+                            <div class="flex justify-between items-center mb-6 bg-white/5 p-3 rounded-2xl">
+                                <span class="text-sm text-slate-400 font-medium">الكمية المتوفرة</span>
+                                <div class="text-left">
+                                    <span class="text-3xl font-black ${isLow ? 'text-red-500' : 'text-emerald-500'}">${item.qty}</span>
+                                    <span class="text-[10px] text-slate-500 block">قطعة</span>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <button onclick="openQtyModal('${id}', '${item.name}', 'add')" class="bg-emerald-500/10 hover:bg-emerald-500 text-emerald-500 hover:text-white py-3 rounded-xl transition font-bold flex items-center justify-center gap-2">
+                                    <i class="fas fa-plus-circle"></i> إضافة
+                                </button>
+                                <button onclick="openQtyModal('${id}', '${item.name}', 'sub')" class="bg-amber-500/10 hover:bg-amber-500 text-amber-500 hover:text-white py-3 rounded-xl transition font-bold flex items-center justify-center gap-2">
+                                    <i class="fas fa-minus-circle"></i> خصم
+                                </button>
+                            </div>
+                            <div class="mt-4 flex justify-between items-center opacity-40 group-hover:opacity-100 transition">
+                                <button onclick="deleteItem('${id}')" class="text-[15px] text-red-400 hover:underline">
+                                    <i class="fas fa-trash"></i> حذف السجل
+                                </button>
+                                <span class="text-[15px] text-slate-500 italic">تحديث: ${new Date(item.updatedAt).toLocaleDateString('ar-EG')}</span>
+                            </div>
+                        </div>`;
+                    grid.appendChild(card);
+                });
+
+                document.getElementById('statTotalItems').innerText = tItems;
+                document.getElementById('statTotalQty').innerText = tQty;
+                document.getElementById('statLowStock').innerText = lowStock;
+                document.getElementById('statOrigin').innerText = `${hindi} هندي / ${irani} ايراني `;
+            });
+        }
+
+        // --- Modals UI ---
+        window.openQtyModal = (id, name, action) => {
+            currentModalTarget = id;
+            currentModalAction = action;
+            document.getElementById('modalTitle').innerText = action === 'add' ? 'إضافة كمية للمخزن' : 'خصم كمية من المخزن';
+            document.getElementById('modalItemName').innerText = name;
+            document.getElementById('modalInput').value = '';
+            document.getElementById('qtyModal').classList.add('active');
+            setTimeout(() => document.getElementById('modalInput').focus(), 200);
+        };
+
+        window.closeModal = () => {
+            document.querySelectorAll('.modal').forEach(m => m.classList.remove('active'));
+        };
+
+        window.openSettings = () => {
+            document.getElementById('settingsModal').classList.add('active');
+        };
+
+        document.getElementById('btnConfirmQty').onclick = async () => {
+            const val = parseFloat(document.getElementById('modalInput').value);
+            if (!val || val <= 0) return;
+            const finalVal = currentModalAction === 'add' ? val : -val;
+            try {
+                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'inventory', currentModalTarget);
+                const docSnap = await getDoc(docRef);
+                const currentData = docSnap.data();
+                const newQty = currentData.qty + finalVal;
+                if (newQty < 0) { alert("⚠️ الكمية غير كافية!"); return; }
+                await updateDoc(docRef, { 
+                    qty: increment(finalVal),
+                    updatedAt: new Date().toISOString()
+                });
+                if (currentModalAction === 'sub' && newQty <= 50) {
+                    sendTelegramAlert(currentData.name, newQty, currentData.code);
+                }
+                closeModal();
+            } catch (err) { console.error(err); }
+        };
+
+        window.deleteItem = async (id) => {
+            if (confirm("هل تريد حذف هذا المنتج نهائياً؟")) {
+                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'inventory', id));
+            }
+        };
+
+        window.filterItems = (type) => {
+            const cards = document.querySelectorAll('#productsGrid > div');
+            cards.forEach(card => {
+                if (type === 'الكل') card.style.display = 'block';
+                else if (type === 'low') card.style.display = card.classList.contains('low-stock-pulse') ? 'block' : 'none';
+            });
+        };
+
+        document.getElementById('searchInput').oninput = (e) => {
+            const term = e.target.value.toLowerCase();
+            const cards = document.querySelectorAll('#productsGrid > div');
+            cards.forEach(card => {
+                card.style.display = card.innerText.toLowerCase().includes(term) ? 'block' : 'none';
+            });
+        };
+    window.exportToExcel = async () => {
+    try {
+        const querySnapshot = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'inventory'));
+        
+        let csvContent = "\uFEFF"; 
+        csvContent += "تاريخ التقرير;اسم المنتج;المنشأ;النوع;الكود;الكمية\n";
+        
+        const today = new Date().toLocaleDateString('ar-EG');
+
+        querySnapshot.forEach(docSnap => {
+            const item = docSnap.data();
+            
+            // تحويل المنشأ لرموز (i و h) كما طلبت
+            let originSymbol = item.origin;
+            if (item.origin === 'إيراني') originSymbol = 'ايراني';
+            else if (item.origin === 'هندي') originSymbol = 'هندي';
+            
+            // تنظيف النصوص من أي علامات قد تخرب الجدول
+            const name = (item.name || "بدون اسم").replace(/;/g, '-');
+            const cat = (item.category || "عام").replace(/;/g, '-');
+            const code = item.code || "N/A";
+            const qty = item.qty || 0;
+            const price = item.sellPrice || 0;
+
+            // بناء السطر بفاصلة منقوطة للانتقال للخلية التالية
+            csvContent += `${today};${name};${originSymbol};${cat};${code};${qty}\n`;
+        });
+
+        // 2. تحويل البيانات لملف قابل للتحميل
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        
+        // تسمية الملف باسم المخزن مع التاريخ
+        const fileName = `تقرير_مخزن_الأسدي_${new Date().toISOString().split('T')[0]}.csv`;
+        
+        link.setAttribute("href", url);
+        link.setAttribute("download", fileName);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        alert("✅ تم تصدير الجدول بنجاح");
+    } catch (err) {
+        console.error(err);
+        alert("❌ حدث خطأ أثناء التصدير");
+    }
+};
+    </script>
+</body>
+</html>
