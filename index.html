@@ -300,12 +300,65 @@
             closeModal();
         };
 
-        async function sendTelegramAlert(itemName, qty, code) {
-            if (!settings.tgToken || !settings.tgChatId) return;
-            const message = `🚨 *تنبيه مخزن الأسدي*\n\nالمادة: ${itemName}\nالكود: ${code}\nالكمية: ${qty}\n⚠️ *الكمية شارفت على النفاذ!*`;
-            const url = `https://api.telegram.org/bot${settings.tgToken}/sendMessage?chat_id=${settings.tgChatId}&text=${encodeURIComponent(message)}&parse_mode=Markdown`;
-            try { fetch(url); } catch (e) { console.error("Telegram fail", e); }
+        // دالة لجلب الإعدادات من المسار الموجود بالصورة (settings -> telegram)
+async function getTelegramConfig() {
+    try {
+        const docRef = doc(db, 'settings', 'telegram'); // المسار كما في الصورة
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+            return docSnap.data();
+        } else {
+            console.error("لم يتم العثور على مستند الإعدادات في فايربيس");
+            return null;
         }
+    } catch (e) {
+        console.error("خطأ في الاتصال بفايربيس لجلب الإعدادات:", e);
+        return null;
+    }
+}
+
+// دالة التنبيهات المحدثة
+async function sendTelegramAlert(itemName, qty, code, type = 'low') {
+    const config = await getTelegramConfig();
+    if (!config) return;
+
+    let message = "";
+    if (type === 'low') {
+        message = `🚨 *تنبيه: بضاعة شارفت على النفاذ*\n\n📦 المادة: ${itemName}\n🔢 الكود: ${code}\n📉 الكمية: ${qty} م²\n⚠️ *يرجى إعادة الطلب!*`;
+    } else {
+        message = `✅ *تم إضافة بضاعة جديدة*\n\n📦 المادة: ${itemName}\n🔢 الكود: ${code}\n📈 الكمية المضافة: ${qty} م²`;
+    }
+
+    const url = `https://api.telegram.org/bot${config.token}/sendMessage?chat_id=${config.chatId}&text=${encodeURIComponent(message)}&parse_mode=Markdown`;
+    fetch(url).catch(e => console.error("Telegram fail", e));
+}
+
+// دالة التقرير الشامل (الاقتراح 5)
+window.sendFullSummary = async () => {
+    const config = await getTelegramConfig();
+    if (!config) return alert("❌ فشل جلب إعدادات التليجرام");
+
+    const querySnapshot = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'inventory'));
+    let totalItems = 0, totalMeters = 0, lowStockItems = [];
+
+    querySnapshot.forEach(docSnap => {
+        const item = docSnap.data();
+        totalItems++;
+        totalMeters += Number(item.qty || 0);
+        if (item.qty <= 50) lowStockItems.push(`${item.name} (${item.qty} م²)`);
+    });
+    
+    let summary = `📊 *تقرير مخزن الأسدي اليومي*\n\n🔹 عدد الأصناف: ${totalItems}\n🔹 المجموع: ${totalMeters.toFixed(1)} م²\n\n⚠️ *النواقص:* \n${lowStockItems.length > 0 ? lowStockItems.join('\n') : "لا توجد"}`;
+    
+    const url = `https://api.telegram.org/bot${config.token}/sendMessage?chat_id=${config.chatId}&text=${encodeURIComponent(summary)}&parse_mode=Markdown`;
+    
+    try {
+        await fetch(url);
+        alert("✅ تم إرسال التقرير الشامل");
+    } catch (e) {
+        alert("❌ فشل الإرسال");
+    }
+};
 
         // --- إضافة المنتج (تم إلغاء الرفع المعلق واستبداله بالحفظ المباشر) ---
         document.getElementById('productForm').onsubmit = async (e) => {
